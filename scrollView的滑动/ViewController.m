@@ -13,7 +13,7 @@
 #define myWidth  [UIScreen mainScreen].bounds.size.width
 #define myHeight [UIScreen mainScreen].bounds.size.height
 
-@interface ViewController ()<WKFCircularSlidingViewDelegate>
+@interface ViewController ()
 
 @property (nonatomic,strong)NSMutableArray *firstViewImageArray;
 
@@ -24,15 +24,23 @@
 @implementation ViewController
 
 - (void)viewDidLoad {
+  
   [super viewDidLoad];
   
+  __weak typeof(self)weakSelf = self;
   
-  //第一个scrollView
-  WKFCircularSlidingView * firstView = [[WKFCircularSlidingView alloc]init];
-#warning  先设置frame  在给图片
-  firstView.frame=CGRectMake(0, 70, myWidth, myWidth * 400 / 640);
-  firstView.delegate=self;
-  firstView.imagesArray = self.firstViewImageArray;
+  CGFloat scrollWidth = 300;
+  CGFloat scrollHeight = scrollWidth * 40 / 64;
+  
+  CGRect frame=CGRectMake(0, 70, scrollWidth, scrollHeight);
+  
+  //scrollView
+  WKFCircularSlidingView * firstView = [[WKFCircularSlidingView alloc]initWithFrame:frame ImagesArray:self.firstViewImageArray andClickImageBlock:^(int tag) {
+    
+    weakSelf.statusLabel.text = [NSString stringWithFormat:@"点击了第  %d  张图",tag];
+    
+  } withChangeAnImageTime:3];
+  
   [self.view addSubview:firstView];
   
   //label
@@ -44,32 +52,22 @@
   [self.view addSubview:statusLabel];
 
 }
-#pragma mark -WKFCircularSlidingViewDelegate代理方法
--(void)clickCircularSlidingView:(int)tag{
-  
-  _statusLabel.text = [NSString stringWithFormat:@"点击了第  %d  张图",tag];
-  
-}
 
 
-
--(NSMutableArray *)firstViewImageArray{
+- (NSMutableArray *)firstViewImageArray{
   
   if (_firstViewImageArray==nil) {
     
     _firstViewImageArray = [NSMutableArray array];
     
-#warning 改变imageCount的个数 最多是9
-    //图片的个数 可以控制
-    int imageCount = 2;
+    // 改变imageCount的个数 最多是9
+    int imageCount = 4;
     for (int i = 0; i < imageCount; i++) {
       
       NSString *imageName = [NSString stringWithFormat:@"%02d",i+1];
       [_firstViewImageArray addObject:imageName];
       
     }
-    
-    
   }
   return _firstViewImageArray;
 }

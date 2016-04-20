@@ -8,22 +8,15 @@
 
 #import <UIKit/UIKit.h>
 
+typedef void(^ClickImageBlock)(int tag);
 
-@protocol WKFCircularSlidingViewDelegate <NSObject>
-
--(void)clickCircularSlidingView:(int)tag;
-
-@end
 
 @interface WKFCircularSlidingView : UIView
 
-//用来接受图片的数组
-@property (nonatomic,strong) NSArray * imagesArray;
+- (instancetype)initWithFrame:(CGRect)frame ImagesArray:(NSArray *)imagesArray
+                 andClickImageBlock:(ClickImageBlock)clickImageBlock
+              withChangeAnImageTime:(CGFloat)time;
 
-//scrollView的宽度
-@property (nonatomic,assign) CGFloat scrollWidth;
-
-@property (nonatomic,weak)id<WKFCircularSlidingViewDelegate>delegate;
 
 
 @end

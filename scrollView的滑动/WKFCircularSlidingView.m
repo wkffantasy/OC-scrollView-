@@ -8,83 +8,129 @@
 
 #import "WKFCircularSlidingView.h"
 
-//#define myWidth  [UIScreen mainScreen].bounds.size.width
-//#define myHeight [UIScreen mainScreen].bounds.size.height
+#import "Masonry.h"
 
-@interface WKFCircularSlidingView ()<UIScrollViewDelegate>
+#define  pageControlH  20
 
-@property (nonatomic,weak)UIPageControl *myPageControl;
+@interface WKFCircularSlidingView () <UIScrollViewDelegate>
 
-@property (nonatomic,weak)UIScrollView *myScrollView;
+@property (copy,nonatomic)    ClickImageBlock clickImage;
 
-@property (nonatomic,strong)NSMutableArray *myImagesArray;
+@property (weak,nonatomic)    UIPageControl *myPageControl;
 
-@property (nonatomic,strong)NSTimer *myTimer;
+@property (weak,nonatomic)    UIScrollView *myScrollView;
+
+@property (strong,nonatomic)  NSArray *myImagesArray;
+
+@property (strong,nonatomic)  NSTimer *myTimer;
+
+@property (assign, nonatomic) CGFloat timeToChange;
+
 
 @end
 
 @implementation WKFCircularSlidingView
 
-
--(instancetype)initWithFrame:(CGRect)frame{
+- (instancetype)initWithFrame:(CGRect)frame ImagesArray:(NSArray *)imagesArray andClickImageBlock:(ClickImageBlock)clickImageBlock withChangeAnImageTime:(CGFloat)time{
   
   if (self = [super initWithFrame:frame]) {
+   
+    if (0 >= time) {
+      self.timeToChange = 3.f;
+    } else {
+      self.timeToChange = time;
+    }
+    self.clickImage = clickImageBlock;
     
-    //创建子控件
+    [self initWithImagesArray:imagesArray];
+    
     [self setupChildViews];
     
   }
   return self;
   
 }
+
 //创建子控件
 -(void)setupChildViews{
   
-  //创建scrollView
+  NSAssert(self.myImagesArray.count !=2 , @"");
+  NSAssert(self.myImagesArray.count !=3 , @"");
+  
+  //scrollView
   UIScrollView *scrollView = [[UIScrollView alloc]init];
   scrollView.bounces=NO;
   scrollView.delegate=self;
   scrollView.pagingEnabled=YES;
   scrollView.showsHorizontalScrollIndicator=NO;
+  scrollView.contentSize = CGSizeMake(self.frame.size.width * self.myImagesArray.count, self.frame.size.height);
   _myScrollView=scrollView;
   [self addSubview:scrollView];
   
-  
-  
-  //创建pageControl
+  //pageControl
   UIPageControl * pageControl = [[UIPageControl alloc]init];
   pageControl.userInteractionEnabled=NO;
   pageControl.currentPageIndicatorTintColor =[UIColor redColor];
-  pageControl.pageIndicatorTintColor = [UIColor whiteColor];
+  pageControl.pageIndicatorTintColor = [UIColor greenColor];
+  if (self.myImagesArray.count == 1) {
+    pageControl.numberOfPages = self.myImagesArray.count;
+  } else {
+    
+    pageControl.numberOfPages = self.myImagesArray.count - 2;
+    
+  }
+  pageControl.currentPage = 0;
   _myPageControl = pageControl;
   [self addSubview:pageControl];
   
+  //imageViews
+  UIImageView * lastView = nil;
+  for (int i = 0; i < self.myImagesArray.count; i++) {
+    
+    UIImageView *myImageView = [[UIImageView alloc]init];
+    
+    NSString *imageName = self.myImagesArray[i];
+    myImageView.image = [UIImage imageNamed:imageName];
+    myImageView.userInteractionEnabled=YES;
+    myImageView.tag=i+100;
+    [self.myScrollView addSubview:myImageView];
+    
+    UITapGestureRecognizer * tap = [[UITapGestureRecognizer alloc]initWithTarget:self action:@selector(clickScrollViewImage:)];
+    [myImageView addGestureRecognizer:tap];
+    
+    myImageView.frame = CGRectMake(i * self.frame.size.width, 0, self.frame.size.width, self.frame.size.height);
+    
+    lastView = myImageView;
+  }
   
+  if (self.myImagesArray.count != 1) {
+    
+    [self.myScrollView setContentOffset:CGPointMake(self.bounds.size.width, 0) animated:NO];
+    [self addTimer];
+  }
   
+  [_myScrollView mas_makeConstraints:^(MASConstraintMaker *make) {
+    
+    make.top.and.right.and.left.and.bottom.mas_equalTo(0);
+    
+  }];
+  [_myPageControl mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.bottom.and.right.and.left.mas_equalTo(0);
+    make.height.mas_equalTo(pageControl);
+  }];
+
 }
+
 #pragma mark - 点击轮播图中任意一个图片的时候
 -(void)clickScrollViewImage:(UITapGestureRecognizer *)tap{
   
-  //设置tag
-  int tag =(int)tap.view.tag-100;
-  if (tag==self.myImagesArray.count-1) {
-    tag=1;
-  }else if (tag==0){
-    tag=(int)self.myImagesArray.count-2;
-  }else{
-    
+  if (self.clickImage) {
+    self.clickImage((int)self.myPageControl.currentPage);
   }
-  
-  //通知代理做事情
-  if ([_delegate respondsToSelector:@selector(clickCircularSlidingView:)]) {
-    [_delegate clickCircularSlidingView:tag];
-  }
-  
-  
+
 }
 
 #pragma mark - UIScrollViewDelegate代理方法
-
 - (void)scrollViewDidScroll:(UIScrollView *)scrollView {
   
   CGFloat x = scrollView.contentOffset.x;
@@ -95,12 +141,16 @@
   CGPoint point =scrollView.contentOffset;
   
   if (point.x==0) {
-    [self.myScrollView setContentOffset:CGPointMake(self.bounds.size.width*(self.myImagesArray.count-2), 0) animated:NO];
+    
+    [self.myScrollView setContentOffset:CGPointMake(self.bounds.size.width * (self.myImagesArray.count-2), 0) animated:NO];
+    
   }else if (point.x==self.bounds.size.width*(self.myImagesArray.count-1)){
+    
     [self.myScrollView setContentOffset:CGPointMake(self.bounds.size.width, 0) animated:NO];
     
   }
 }
+
 
 - (void)scrollViewWillBeginDragging:(UIScrollView *)scrollView {
   
@@ -114,15 +164,13 @@
   
 }
 
-#pragma mark - 计时器
-//添加计时器
+#pragma mark - myTimer
 - (void)addTimer {
   
-  self.myTimer = [NSTimer scheduledTimerWithTimeInterval:2 target:self selector:@selector(runTimer) userInfo:nil repeats:YES];
+  self.myTimer = [NSTimer scheduledTimerWithTimeInterval:self.timeToChange target:self selector:@selector(runTimer) userInfo:nil repeats:YES];
   [[NSRunLoop currentRunLoop] addTimer:_myTimer forMode:NSRunLoopCommonModes];
 }
 
-//移除计时器
 - (void)removeTimer {
   
   [self.myTimer invalidate];
@@ -131,9 +179,7 @@
   
 }
 
-//计时器运行的方法
 -(void)runTimer{
-  
   
   NSInteger page = self.myPageControl.currentPage;
   
@@ -153,121 +199,27 @@
   
 }
 
--(void)setImagesArray:(NSArray *)imagesArray{
+- (void)initWithImagesArray:(NSArray *)imagesArray{
   
-  _imagesArray = imagesArray;
+  NSAssert(imagesArray.count>0, @"");
   
-  if (self.imagesArray.count==0) {
-    
+  if (imagesArray.count == 1) {
+    self.myImagesArray = imagesArray;
     return;
-    
   }
   
-  for (int i=0; i<self.imagesArray.count; i++) {
-    
-    NSString * imageString =self.imagesArray[i];
-    [self.myImagesArray addObject:imageString];
-    
-  }
+  NSMutableArray * temArray = [[NSMutableArray alloc]initWithArray:imagesArray];
   
-  if (self.imagesArray.count==1) {
-    
-    //填充scrollView的contentSize
-    [self setupScrollViewSubviews];
-    return ;
-  }
-  
-  //把最后一个图片添加到这个数组的第一个位置
-  NSString * imageString1 = [self.imagesArray lastObject];
-  [self.myImagesArray insertObject:imageString1 atIndex:0];
-  
-  //把原本第一张的图片 添加到这个数组的末尾
-  NSString * imageString2 = [self.imagesArray firstObject];
-  [self.myImagesArray addObject:imageString2];
-  
-  //填充scrollView的contentSize
-  [self setupScrollViewSubviews];
-  
-  
-  
-  
-  
-}
+  NSString * lastImage = [imagesArray lastObject];
+  [temArray insertObject:lastImage atIndex:0];
 
-//填充scrollView的contentSize
--(void)setupScrollViewSubviews{
+  NSString * firstImage = [imagesArray firstObject];
+  [temArray addObject:firstImage];
   
-  //给scrollView添加图片
-  for (int i = 0; i < self.myImagesArray.count; i++) {
-    
-    UIImageView *myImageView = [[UIImageView alloc]init];
-    
-    NSString *imageName = self.myImagesArray[i];
-    myImageView.image = [UIImage imageNamed:imageName];
-    myImageView.userInteractionEnabled=YES;
-    myImageView.tag=i+100;
-    [self.myScrollView addSubview:myImageView];
-    
-    //添加手势
-    UITapGestureRecognizer * tap = [[UITapGestureRecognizer alloc]initWithTarget:self action:@selector(clickScrollViewImage:)];
-    [myImageView addGestureRecognizer:tap];
-    
-    
-  }
+  self.myImagesArray = temArray;
   
-  
-  if (self.myImagesArray.count==1) {
-    
-    self.myScrollView.contentSize = CGSizeMake(self.bounds.size.width, 0);
-    self.myScrollView.scrollEnabled=NO;
-    [self removeTimer];
-    self.myPageControl.numberOfPages=1;
-    
-  }else{
-    self.myScrollView.contentSize = CGSizeMake(self.bounds.size.width * self.myImagesArray.count, 0);
-    [self.myScrollView setContentOffset:CGPointMake(self.bounds.size.width, 0) animated:NO];
-    self.myPageControl.numberOfPages= self.myImagesArray.count-2;
-    [self addTimer];
-    
-  }
+  NSAssert(self.myImagesArray.count == imagesArray.count+2, @"");
 
-}
-
-
--(NSMutableArray *)myImagesArray{
-  
-  if (_myImagesArray==nil) {
-    
-    _myImagesArray =[NSMutableArray array];
-  }
-  return _myImagesArray;
-  
-}
-
--(void)layoutSubviews{
-  
-  [super layoutSubviews];
-  
-  //轮播图的frame
-  self.myScrollView.frame=self.bounds;
-  
-  //pageControl的frame
-  CGFloat pageControlH = 20;
-  CGFloat pageControlW = self.bounds.size.width;
-  CGFloat pageControlY = self.frame.size.height - pageControlH;
-  CGFloat pageControlX = 0;
-  self.myPageControl.frame=CGRectMake(pageControlX, pageControlY, pageControlW, pageControlH);
-  
-  //scrollView添加的图片的frame
-  for (UIImageView *myImageView in self.myScrollView.subviews) {
-    
-    int i =(int)myImageView.tag-100;
-    
-    myImageView.frame=CGRectMake(i*self.bounds.size.width, 0, self.bounds.size.width, self.bounds.size.height);
-  }
-  
-
-  
 }
 
 
